@@ -9,6 +9,7 @@
 /.chrome-qa
 /.chrome-qa2
 /.codex
+/.codex-runlogs
 /.learnings
 /canvas
 /tmp-app-server-*

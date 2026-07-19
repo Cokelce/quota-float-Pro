@@ -2,6 +2,8 @@ name: CI
 
 on:
   push:
+    branches:
+      - main
   pull_request:
 
 jobs:
@@ -24,13 +26,9 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            artifact-name: quota-float-windows-unsigned
-            build-command: npm run tauri -- build
-            artifact-path: src-tauri/target/release/bundle/**
+            build-command: npm run tauri -- build --no-bundle
           - os: macos-latest
-            artifact-name: quota-float-macos-universal-unsigned
-            build-command: npm run tauri -- build --target universal-apple-darwin
-            artifact-path: src-tauri/target/universal-apple-darwin/release/bundle/**
+            build-command: npm run tauri -- build --target universal-apple-darwin --no-bundle
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -48,9 +46,3 @@ jobs:
       - run: npm ci
       - run: cargo test --manifest-path src-tauri/Cargo.toml
       - run: ${{ matrix.build-command }}
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact-name }}
-          path: ${{ matrix.artifact-path }}
-          if-no-files-found: error
-          retention-days: 14
