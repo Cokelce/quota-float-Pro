@@ -93,6 +93,19 @@ Windows 下 Tauri 可能会下载 WiX 用于生成 MSI。如果 WiX 下载失败
 src-tauri/target/release/quota-float.exe
 ```
 
+## 自动更新
+
+二改版自动更新已对接本仓库：
+
+```text
+https://github.com/Cokelce/quota-float-Pro/releases/latest/download/latest.json
+```
+
+发布新版本时，推送 `v*` tag 会触发 GitHub Actions 生成 Release 和 updater 所需的 `latest.json`。仓库 Settings -> Secrets and variables -> Actions 需要配置：
+
+- `TAURI_SIGNING_PRIVATE_KEY`
+- `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`，如果生成私钥时没有设置密码可以留空不配
+
 ## 上游项目
 
 - 上游项目：[change-42-yhmm/quota-float](https://github.com/change-42-yhmm/quota-float)

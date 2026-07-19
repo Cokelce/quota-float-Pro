@@ -42,20 +42,21 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: v__VERSION__
-          releaseName: Quota Float v__VERSION__
+          releaseName: Quota Float Pro v__VERSION__
           releaseBody: |
             ## What's new
 
-            - Keeps showing weekly quota when the 5-hour window is temporarily unavailable, with a clear `W` badge.
-            - Adds persistent expansion, clearer active controls, exact reset time, and localized tray actions.
-            - Adds automatic update checks and a safe GitHub Releases fallback link.
-            - Improves edge docking and transparent rounded-window rendering on Windows and macOS.
+            - Keeps the upstream Codex quota widget behavior for official account login.
+            - Adds API and third-party compatible balance monitoring for USD balances.
+            - Adds CC Switch and Codex++ provider detection.
+            - Adds theme presets, progress styles, and smoother floating widget interactions.
+            - Checks future updates from the quota-float-Pro GitHub Releases feed.
 
-            ![Quota Float weekly quota fallback](https://raw.githubusercontent.com/change-42-yhmm/quota-float/main/docs/images/quota-v0.1.4-weekly-fallback.png)
+            ![Quota Float Pro theme preview](https://raw.githubusercontent.com/Cokelce/quota-float-Pro/main/docs/images/themes/theme-aurora.png)
 
             ## Privacy
 
-            Quota Float remains local-first: it reads the existing Codex Desktop login state only for quota requests and does not upload prompts, chats, raw quota responses, or local credentials.
+            Quota Float Pro remains local-first: it reads existing local Codex/API configuration only for quota and balance requests and does not upload prompts, chats, raw quota responses, API keys, cookies, or local credentials.
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}

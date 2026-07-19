@@ -14,7 +14,7 @@
     {
       "identifier": "opener:allow-open-url",
       "allow": [
-        { "url": "https://github.com/change-42-yhmm/quota-float/releases/*" }
+        { "url": "https://github.com/Cokelce/quota-float-Pro/releases/*" }
       ]
     },
     "window-state:default"

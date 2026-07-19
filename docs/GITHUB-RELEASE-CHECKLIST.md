@@ -16,6 +16,7 @@ GitHub 需要：
 - 一个 GitHub 仓库
 - GitHub Actions 已启用
 - 代码已推送到默认分支
+- Actions Secrets 已配置 `TAURI_SIGNING_PRIVATE_KEY`，这样 Release 会生成自动更新需要的 `latest.json`
 
 macOS Universal 构建需要的 Rust targets 已经在 CI/release workflow 中自动安装：
 
@@ -59,7 +60,11 @@ git push origin v0.1.0
 - `quota-float-windows-unsigned.zip`
 - `quota-float-macos-universal-unsigned.zip`
 
-确认无误后点击 Publish release，然后把 Release 链接发给用户。
+确认无误后把 Release 链接发给用户。应用内检查更新会读取：
+
+```text
+https://github.com/Cokelce/quota-float-Pro/releases/latest/download/latest.json
+```
 
 ## 发给 Mac 用户时的说明
 

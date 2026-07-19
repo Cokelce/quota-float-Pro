@@ -13,14 +13,25 @@ macOS 包使用 Universal 构建，同时支持 Apple Silicon 和 Intel Mac。
 
 ## 发布一个 GitHub 下载版本
 
-推送 `v*` tag 会触发 `.github/workflows/release.yml`，构建 Windows unsigned 包和 macOS Universal unsigned 包，并上传到草稿 GitHub Release。
+推送 `v*` tag 会触发 `.github/workflows/release.yml`，构建 Windows unsigned 包和 macOS Universal unsigned 包，并上传到 GitHub Release。
+
+二改版自动更新检查的是当前仓库：
+
+```text
+https://github.com/Cokelce/quota-float-Pro/releases/latest/download/latest.json
+```
 
 ```bash
 git tag v0.1.0
 git push origin v0.1.0
 ```
 
-工作流完成后，到 GitHub Releases 检查草稿发布，确认说明和附件后手动发布。
+工作流完成后，到 GitHub Releases 检查发布说明和附件。
+
+自动更新签名需要在仓库 Settings -> Secrets and variables -> Actions 配置：
+
+- `TAURI_SIGNING_PRIVATE_KEY`
+- `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`，如果生成私钥时没有设置密码可以留空不配
 
 ## CI 与构建
 
