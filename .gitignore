@@ -1,11 +1,18 @@
 /node_modules
 /dist
+/outputs
 /release
 /src-tauri/target
+/.codex-target*/
+/.tauri-dev-target/
 /.agents
 /.chrome-qa
 /.chrome-qa2
 /.codex
+/.learnings
+/canvas
+/tmp-app-server-*
+/.codex-update-check-state.json
 /.idea
 /.vscode
 *.log
@@ -24,4 +31,5 @@
 auth.json
 credentials.json
 token.json
+.tauri-updater.key
 /效果/

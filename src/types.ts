@@ -1,6 +1,8 @@
 export type ProviderId = "codex" | "claude";
 export type SnapshotStatus = "ok" | "stale" | "loading" | "unavailable" | "signed_out";
 export type Language = "zh-CN" | "en";
+export type ThemeName = "aurora" | "dark" | "qingci" | "bamboo" | "peacock" | "lvyun" | "xinghe";
+export type ProgressStyle = "solid" | "segmented";
 
 export interface UsageWindow {
   remainingPercent: number;
@@ -14,6 +16,10 @@ export interface ProviderSnapshot {
   plan: string | null;
   shortWindow: UsageWindow | null;
   weeklyWindow: UsageWindow | null;
+  balance?: string | null;
+  balanceLabel?: string | null;
+  balancePercent?: number | null;
+  balanceSourceKey?: string | null;
   resetCredits: number | null;
   resetCreditExpiresAt?: string[];
   updatedAt: string;
@@ -24,7 +30,11 @@ export interface ProviderSnapshot {
 export interface WidgetPreferences {
   locked: boolean;
   alwaysOnTop: boolean;
+  stayExpanded: boolean;
   pinnedProvider: ProviderId | null;
   autoRotateSeconds: number;
   language: Language;
+  theme: ThemeName;
+  progressStyle: ProgressStyle;
 }
+

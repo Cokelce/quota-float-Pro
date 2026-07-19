@@ -1,116 +1,102 @@
-# Quota Float
+# quota-float-Pro
 
-Lightweight floating desktop widget for checking Codex quota from the local Codex Desktop login state.
+`quota-float-Pro` 是基于 [change-42-yhmm/quota-float](https://github.com/change-42-yhmm/quota-float) 的二次开发版本。原项目提供 Codex 官方账号额度悬浮窗，本项目在保留原有官方账号额度读取能力的基础上，增加了 API/第三方兼容平台余额监督、主题系统和更完整的桌面端交互。
 
-![Quota Float quota states](docs/images/quota-states.png)
+> 本项目只用于本机监督 Codex 额度/余额用量，提示额度大概什么时候会用完；不会保存 API Key、Cookie、账号数据、原始接口响应、提示词或聊天记录。
 
-## Highlights
+## 二改新增功能
 
-- Shows your Codex plan, 5-hour quota, weekly quota, and next reset time in a compact always-on-top widget.
-- Uses clear quota states for healthy, caution, and critical remaining usage.
-- Collapses into a small floating orb when idle, then expands on hover.
-- Indicates whether quota is currently being consumed.
-- Includes quick controls for language switching and always-on-top behavior.
-- Shows reset credit count and available reset-credit expiration times when the quota service provides them.
-- Handles stale data, signed-out sessions, unavailable quota responses, and loading states without fabricating values.
+- 保留官方 Codex 登录态额度读取：继续显示官方账号的 5 小时额度、本周额度、重置时间和重置机会。
+- 增加 API 登录识别：当检测到 API/第三方兼容接口登录时，自动切换到余额展示，不再误提示 Codex 未登录。
+- 兼容 CC Switch：可读取当前 Codex provider、真实 base URL、Usage Query、余额接口和本地 provider 配置。
+- 兼容 Codex++：支持读取 `~/.codex-session-delete/settings.json` 的当前 relay 配置，以及激活 profile 中的 `authContents` / `configContents`。
+- 支持第三方 USD 余额接口：自动探测常见余额路径，包括 `/v1/usage`、`/usage`、`/balance`、`/credits` 等。
+- API 余额只显示 USD：不会用请求次数、daily usage 或非余额字段冒充余额。
+- API 进度条按本机余额高水位计算：当前余额作为 100%，余额下降时进度同步下降，续费增加后重新回到 100%。
+- 新增主题设置窗口：托盘菜单点击“主题”打开独立设置窗口，可切换主题、置顶、常态展开、轮播速度和进度条样式。
+- 新增 7 套主题：极光、深色、青瓷、竹绿、孔雀绿、绿云、星河。
+- 新增连续/分段进度条：分段进度条固定 5 段，并适配当前主题色。
+- 优化悬浮窗交互：圆球/展开动画更顺滑，修复圆球变长方形、鼠标移入闪动、非默认主题灰色外圈等问题。
 
-## Screenshots
+## 主题预览
 
-| Quota states | Floating orb | Reset credit expiration |
+| 极光 | 深色 |
+| --- | --- |
+| ![极光主题](docs/images/themes/theme-aurora.png) | ![深色主题](docs/images/themes/theme-dark.png) |
+
+| 青瓷 | 竹绿 |
+| --- | --- |
+| ![青瓷主题](docs/images/themes/theme-qingci.png) | ![竹绿主题](docs/images/themes/theme-bamboo.png) |
+
+| 孔雀绿 | 绿云 |
+| --- | --- |
+| ![孔雀绿主题](docs/images/themes/theme-peacock.png) | ![绿云主题](docs/images/themes/theme-lvyun.png) |
+
+| 星河 |
+| --- |
+| ![星河主题](docs/images/themes/theme-xinghe.png) |
+
+## 界面示例
+
+| 官方账号额度 | API 余额 | 圆球模式 |
 | --- | --- | --- |
-| ![Healthy, caution, and critical quota states](docs/images/quota-states.png) | ![Collapsed quota orb](docs/images/quota-orb.png) | ![Reset credit expiration popover](docs/images/quota-reset-expiration.png) |
+| ![官方账号额度状态](docs/images/quota-states.png) | ![API 余额卡片](docs/images/quota-api-balance-card.png) | ![圆球模式](docs/images/quota-orb.png) |
 
-## Repository Metadata
+## 支持的数据来源
 
-Suggested repository description:
+- Codex Desktop 官方登录态：通过本机 Codex/Codex Desktop 登录状态读取官方额度。
+- OpenAI API 或 OpenAI-compatible API：读取配置中的 `base_url`、`experimental_bearer_token`、`OPENAI_API_KEY` 或 auth 文件。
+- CC Switch：读取当前 Codex provider 和 Usage Query 配置。
+- Codex++：读取当前 relay/API 配置，切换 API 后下次刷新会重新识别。
 
-```text
-Floating Windows/macOS desktop widget for checking Codex quota from the local Codex Desktop login state.
-```
+如果第三方服务没有暴露可识别的 USD 余额接口，小组件会提示“已连接 API，但没有检测到可用的 USD 余额字段”，不会编造余额。
 
-Suggested topics:
+## 隐私边界
 
-```text
-codex, quota, tauri, react, rust, desktop-app, windows, macos, productivity
-```
+- 不保存 API Key、Codex token、Cookie、验证码或账号资料。
+- 不保存原始额度响应、请求日志、提示词或聊天内容。
+- 只保存小组件偏好设置和本机余额高水位基线，用于进度条计算。
+- 余额接口请求只在本机配置的官方或第三方 API 地址上发起。
+- 不包含遥测、统计、崩溃上报或第三方追踪。
+- 不会兑换重置机会，也不会修改账号设置。
 
-## How It Works
+## 开发
 
-Quota Float reads the existing Codex Desktop login state on your machine and queries Codex/ChatGPT quota endpoints with that session. It does not estimate usage from local token counts and does not redeem reset credits or modify account settings.
-
-Browser preview uses mock data. Real quota reading requires the Tauri desktop app and an existing Codex Desktop login on the same machine.
-
-## Download
-
-For normal users, download the latest unsigned build from GitHub Releases:
-
-- Latest release: https://github.com/change-42-yhmm/quota-float/releases/latest
-- Windows: `quota-float-windows-unsigned.zip`
-- macOS Universal: `quota-float-macos-universal-unsigned.zip`
-
-Unzip it and run the app. Unsigned builds may trigger Windows SmartScreen or macOS Gatekeeper warnings. Public distribution to non-technical users should use signed Windows builds and notarized macOS builds.
-
-## Feedback
-
-Please use GitHub Issues for bugs, compatibility reports, and feature requests:
-
-https://github.com/change-42-yhmm/quota-float/issues
-
-## Privacy Boundary
-
-Quota Float is local-first and intentionally narrow:
-
-- Reads the local Codex Desktop login state only to query Codex quota.
-- Sends the existing Codex access token only to ChatGPT quota endpoints.
-- Stores only widget preferences in its own app config directory.
-- Does not store Codex tokens, account IDs, prompts, chat history, raw quota responses, or local auth paths.
-- Does not include telemetry, analytics, crash reporting, or third-party tracking.
-- Does not redeem reset credits or modify account settings.
-
-See [PRIVACY.md](PRIVACY.md) and [SECURITY.md](SECURITY.md) for the full boundary.
-
-## Accuracy Boundary
-
-Codex quota is read from Codex/ChatGPT quota service responses. If the response format changes, the app shows an unavailable or stale state instead of inventing quota values.
-
-## Development
-
-Requirements:
+环境要求：
 
 - Node.js 20+
 - Rust stable
-- Tauri 2 system dependencies for your platform
+- Tauri 2 桌面端依赖
 
 ```bash
 npm install
-npm run dev
-npm run test
+npm test
 npm run build
 npm run tauri dev
 ```
 
-## Build
+Codex Desktop 更新后，可运行兼容性检查：
+
+```bash
+npm run check:codex
+```
+
+## 构建
 
 ```bash
 npm run tauri build
 ```
 
-On Windows, Tauri may download WiX to create an MSI installer. If WiX download fails, the release executable may still be produced at:
+Windows 下 Tauri 可能会下载 WiX 用于生成 MSI。如果 WiX 下载失败，release exe 仍可能生成在：
 
 ```text
 src-tauri/target/release/quota-float.exe
 ```
 
-## Release
+## 上游项目
 
-GitHub Actions are configured for:
-
-- CI on push/PR: frontend tests, Rust tests, web build, Tauri build.
-- `v*` tags: unsigned Windows and macOS Universal bundle artifacts and a public GitHub Release.
-
-See [docs/GITHUB-RELEASE-CHECKLIST.md](docs/GITHUB-RELEASE-CHECKLIST.md) before publishing a version for others.
-
-Do not upload local credentials, `.codex`, `.env*`, screenshots with personal data, `node_modules`, `dist`, `src-tauri/target`, or local installers to source control.
+- 上游项目：[change-42-yhmm/quota-float](https://github.com/change-42-yhmm/quota-float)
+- 本项目为二次开发版本，感谢原作者提供的 Codex 额度悬浮窗基础实现。
 
 ## License
 

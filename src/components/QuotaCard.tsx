@@ -1,5 +1,5 @@
-import { ArrowClockwise, ArrowDown, ArrowUp, ClockCounterClockwise, CloudSlash, PushPin, PushPinSlash, SignIn, WarningCircle } from "@phosphor-icons/react";
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowClockwise, ArrowDown, ArrowUp, ArrowsInSimple, ArrowsOutSimple, ClockCounterClockwise, CloudSlash, Info, PushPin, PushPinSlash, SignIn, WarningCircle } from "@phosphor-icons/react";
+import { memo, type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { clampPercent, formatDateTime, formatResetDate, formatResetTime, quotaTier } from "../lib/format";
 import { copy, normalizeLanguage } from "../lib/i18n";
 import type { Language, ProviderSnapshot, WidgetPreferences } from "../types";
@@ -13,12 +13,13 @@ interface Props {
   onNext: () => void;
   onTogglePin: () => void;
   onLock: () => void;
-  onLanguage: () => void;
+  onToggleStayExpanded: () => void;
   onDrag: () => void;
   onHover: (hovered: boolean) => void;
   onRefresh?: () => void;
+  isClosing?: boolean;
   isConsuming?: boolean;
-  notice?: string | null;
+  notice?: ReactNode;
   initialShowCreditTip?: boolean;
 }
 
@@ -37,9 +38,27 @@ function localizedBackendMessage(message: string | null, language: Language): st
   if (normalized.includes("rate limited")) return "请求过于频繁，将稍后自动重试。";
   if (normalized.includes("network")) return "网络不可用，将自动重试。";
   if (normalized.includes("format")) return "额度响应格式已变化。";
+  if (normalized.includes("usage query") || normalized.includes("balance_url")) return "已连接 CC Switch，但未检测到 USD 余额接口。请在 CC Switch 开启 Usage Query，或在 Codex 配置 balance_url。";
+  if (normalized.includes("balance endpoint") || normalized.includes("balance field")) return "已连接 API，但没有检测到可用的 USD 余额字段。";
   if (normalized.includes("missing the 5h")) return "额度响应缺少 5 小时窗口。";
   if (normalized.includes("refresh is already running")) return "额度正在刷新，请稍候。";
   return message;
+}
+
+function balanceNumber(value: string): number | null {
+  const match = /-?\d+(?:\.\d+)?/.exec(value.replace(/,/g, ""));
+  if (!match) return null;
+  const number = Number(match[0]);
+  return Number.isFinite(number) ? number : null;
+}
+
+function usdBalance(value: string): string {
+  const number = balanceNumber(value);
+  return number === null ? `${value} USD` : `$${number.toFixed(2)} USD`;
+}
+
+function progressStyle(percent: number): CSSProperties {
+  return { width: `${percent}%`, "--progress-value": `${percent}%` } as CSSProperties;
 }
 
 export const QuotaCard = memo(function QuotaCard({
@@ -50,10 +69,11 @@ export const QuotaCard = memo(function QuotaCard({
   onNext,
   onTogglePin: _onTogglePin,
   onLock,
-  onLanguage,
+  onToggleStayExpanded,
   onDrag,
   onHover,
   onRefresh,
+  isClosing = false,
   isConsuming = false,
   notice = null,
   initialShowCreditTip = false,
@@ -63,10 +83,22 @@ export const QuotaCard = memo(function QuotaCard({
   const t = copy[language];
   const primary = snapshot.shortWindow ? clampPercent(snapshot.shortWindow.remainingPercent) : null;
   const weekly = snapshot.weeklyWindow ? clampPercent(snapshot.weeklyWindow.remainingPercent) : null;
+  const displayPercent = primary ?? weekly;
+  const balance = snapshot.balance?.trim() || null;
+  const apiMetricLabel = snapshot.balanceLabel?.trim() || t.apiBalance;
+  const currencyBalance = balance !== null && !snapshot.balanceLabel;
+  const displayBalance = currencyBalance && balance ? usdBalance(balance) : balance;
+  const compactBalance = displayBalance?.replace(/\s+USD$/, "") ?? null;
+  const balanceProgress = snapshot.balancePercent == null ? 100 : clampPercent(snapshot.balancePercent);
+  const displayWindow = snapshot.shortWindow ?? snapshot.weeklyWindow;
+  const displayingWeeklyAsPrimary = primary === null && weekly !== null;
+  const balanceAvailable = displayPercent === null && balance !== null && snapshot.status === "ok";
   const staleAge = Date.now() - new Date(snapshot.updatedAt).getTime();
   const staleExpired = snapshot.status === "stale" && staleAge > 30 * 60_000;
   const available = snapshot.status === "ok" || (snapshot.status === "stale" && !staleExpired);
-  const tier = quotaTier(primary);
+  const tier = quotaTier(balanceAvailable ? balanceProgress : displayPercent);
+  const progressClassName = preferences.progressStyle === "segmented" ? "progress progress--segmented" : "progress";
+  const balanceProgressClassName = preferences.progressStyle === "segmented" ? "progress progress--balance progress--segmented" : "progress progress--balance";
   const indicatorState = isConsuming ? "active" : snapshot.status === "ok" ? "ok" : snapshot.status === "stale" ? "stale" : "error";
   const indicatorLabel = isConsuming
     ? t.active
@@ -84,45 +116,46 @@ export const QuotaCard = memo(function QuotaCard({
 
   return (
     <main
-      className={`quota-card quota-card--${snapshot.status} quota-card--${tier}`}
+      className={`quota-card quota-card--${snapshot.status} quota-card--${tier}${isClosing ? " quota-card--closing" : ""}`}
       onMouseEnter={() => onHover(true)}
       onMouseLeave={() => onHover(false)}
-      onMouseDown={(event) => { if (event.button === 0) void onDrag(); }}
     >
       <div className="aurora" aria-hidden="true" />
-      <span className="sr-only" aria-live="polite">{available && primary !== null ? t.availableLabel(primary) : message}</span>
-      {notice ? <p className="operation-notice" role="status">{notice}</p> : null}
+      <span className="sr-only" aria-live="polite">{available && displayPercent !== null ? (displayingWeeklyAsPrimary ? t.weeklyAvailableLabel(displayPercent) : t.availableLabel(displayPercent)) : balanceAvailable && displayBalance ? t.apiMetricLabel(apiMetricLabel, displayBalance) : message}</span>
+      {notice ? <div className="operation-notice" role="status">{notice}</div> : null}
       <header className="card-header">
-        <div>
+        <div className="card-drag-handle" onMouseDown={(event) => { if (event.button === 0) void onDrag(); }}>
           <p className="eyebrow">{snapshot.displayName} · {snapshot.plan ?? t.accountFallback}</p>
-          {snapshot.status !== "stale" ? <p className="updated">{t.shortRemaining}</p> : null}
+          {snapshot.status !== "stale" ? <p className="updated">{balanceAvailable ? apiMetricLabel : displayingWeeklyAsPrimary ? t.weeklyShortRemaining : t.shortRemaining}</p> : null}
         </div>
         {!preferences.locked ? (
           <nav className="card-actions" aria-label={t.controls} onMouseDown={(event) => event.stopPropagation()}>
             {providerCount > 1 ? <button onClick={onPrevious} aria-label={t.servicePrevious}><ArrowUp /></button> : null}
             {providerCount > 1 ? <button onClick={onNext} aria-label={t.serviceNext}><ArrowDown /></button> : null}
             <span className={`usage-indicator usage-indicator--${indicatorState}`} role="status" aria-label={indicatorLabel} title={indicatorLabel}><i /></span>
-            <button className="language-button" onClick={onLanguage} aria-label={t.switchLanguage} title={t.switchLanguage}>{language === "en" ? "中" : "EN"}</button>
-            <button onClick={onLock} aria-label={preferences.alwaysOnTop ? t.pinOff : t.pinOn} title={preferences.alwaysOnTop ? t.pinOff : t.pinOn}>
-              {preferences.alwaysOnTop ? <PushPin /> : <PushPinSlash />}
+            <button className={preferences.stayExpanded ? "expand-button expand-button--active" : "expand-button"} onClick={onToggleStayExpanded} aria-pressed={preferences.stayExpanded} aria-label={preferences.stayExpanded ? t.keepExpandedOff : t.keepExpandedOn} title={preferences.stayExpanded ? t.keepExpandedOff : t.keepExpandedOn}>
+              {preferences.stayExpanded ? <ArrowsInSimple weight="bold" /> : <ArrowsOutSimple />}
+            </button>
+            <button className={preferences.alwaysOnTop ? "pin-button pin-button--active" : "pin-button"} onClick={onLock} aria-pressed={preferences.alwaysOnTop} aria-label={preferences.alwaysOnTop ? t.pinOff : t.pinOn} title={preferences.alwaysOnTop ? t.pinOff : t.pinOn}>
+              {preferences.alwaysOnTop ? <PushPin weight="fill" /> : <PushPinSlash />}
             </button>
           </nav>
         ) : null}
       </header>
 
-      {available && primary !== null ? (
+      {available && displayPercent !== null ? (
         <>
-          <section className="primary-metric" aria-label={t.availableLabel(primary)}>
-            <span>{primary}</span><small>%</small>
+          <section className="primary-metric" aria-label={displayingWeeklyAsPrimary ? t.weeklyAvailableLabel(displayPercent) : t.availableLabel(displayPercent)}>
+            <span>{displayPercent}</span><small>%</small>
           </section>
-          <div className="progress" role="progressbar" aria-label={t.availableLabel(primary)} aria-valuemin={0} aria-valuemax={100} aria-valuenow={primary}>
-            <span style={{ width: `${primary}%` }} />
+          <div className={progressClassName} role="progressbar" aria-label={displayingWeeklyAsPrimary ? t.weeklyAvailableLabel(displayPercent) : t.availableLabel(displayPercent)} aria-valuemin={0} aria-valuemax={100} aria-valuenow={displayPercent}>
+            <span style={progressStyle(displayPercent)} />
           </div>
-          <p className="reset-time">{formatResetTime(snapshot.shortWindow?.resetsAt ?? null, new Date(), language)}</p>
+          <p className="reset-time">{formatResetTime(displayWindow?.resetsAt ?? null, new Date(), language)}{displayWindow?.resetsAt ? ` · ${formatDateTime(displayWindow.resetsAt, language)}` : ""}</p>
           <footer className="card-footer">
             <div className="weekly-metric">
-              <p>{t.weeklyUntil(formatResetDate(snapshot.weeklyWindow?.resetsAt ?? null, language))}</p>
-              <strong>{weekly ?? "--"}<small>{weekly === null ? "" : "%"}</small></strong>
+              {displayingWeeklyAsPrimary ? <p className="weekly-note"><Info weight="bold" aria-hidden="true" />{t.shortWindowUnavailable}</p> : <p>{t.weeklyUntil(formatResetDate(snapshot.weeklyWindow?.resetsAt ?? null, language))}</p>}
+              <strong className={displayingWeeklyAsPrimary ? "weekly-value--unavailable" : undefined}>{displayingWeeklyAsPrimary ? "--" : weekly ?? "--"}<small>{displayingWeeklyAsPrimary || weekly === null ? "" : "%"}</small></strong>
               <div className="reset-credit-row" onMouseDown={(event) => event.stopPropagation()}>
                 <span>{snapshot.resetCredits === null ? t.resetCreditUnknown : t.resetCredits(snapshot.resetCredits)}</span>
                 {snapshot.resetCredits !== null && snapshot.resetCredits > 0 ? (
@@ -134,6 +167,23 @@ export const QuotaCard = memo(function QuotaCard({
                   {creditExpirations.length > 0 ? creditExpirations.map((item) => <p key={item}>{item}</p>) : <p>{t.noCreditExpiration}</p>}
                 </div>
               ) : null}
+            </div>
+            <ProviderMark />
+          </footer>
+        </>
+      ) : balanceAvailable && displayBalance ? (
+        <>
+          <section className="primary-metric primary-metric--balance" aria-label={t.apiMetricLabel(apiMetricLabel, displayBalance)}>
+            <span>{compactBalance}</span>{currencyBalance ? <small>USD</small> : null}
+          </section>
+          <div className={balanceProgressClassName} aria-hidden="true">
+            <span style={progressStyle(balanceProgress)} />
+          </div>
+          <p className="reset-time">{t.apiBalanceRemaining}</p>
+          <footer className="card-footer">
+            <div className="weekly-metric">
+              <p>{t.progressRemaining}</p>
+              <strong className="weekly-value--balance">{balanceProgress}<small>%</small></strong>
             </div>
             <ProviderMark />
           </footer>
@@ -161,8 +211,18 @@ export const QuotaOrb = memo(function QuotaOrb({ snapshot, onDrag, onHover, lang
   const activeLanguage = normalizeLanguage(language);
   const t = copy[activeLanguage];
   const primary = snapshot.shortWindow ? clampPercent(snapshot.shortWindow.remainingPercent) : null;
-  const tier = quotaTier(primary);
-  const available = snapshot.status === "ok" && primary !== null;
+  const weekly = snapshot.weeklyWindow ? clampPercent(snapshot.weeklyWindow.remainingPercent) : null;
+  const displayPercent = primary ?? weekly;
+  const balance = snapshot.balance?.trim() || null;
+  const apiMetricLabel = snapshot.balanceLabel?.trim() || t.apiBalance;
+  const currencyBalance = balance !== null && !snapshot.balanceLabel;
+  const displayBalance = currencyBalance && balance ? usdBalance(balance) : balance;
+  const compactBalance = displayBalance?.replace(/\s+USD$/, "") ?? null;
+  const displayingWeeklyAsPrimary = primary === null && weekly !== null;
+  const available = snapshot.status === "ok" && displayPercent !== null;
+  const balanceAvailable = snapshot.status === "ok" && displayPercent === null && balance !== null;
+  const balanceProgress = snapshot.balancePercent == null ? 100 : clampPercent(snapshot.balancePercent);
+  const tier = quotaTier(balanceAvailable ? balanceProgress : displayPercent);
 
   useEffect(() => {
     idleTimer.current = window.setTimeout(() => setIdle(true), 2000);
@@ -179,17 +239,30 @@ export const QuotaOrb = memo(function QuotaOrb({ snapshot, onDrag, onHover, lang
 
   return (
     <main
-      className={`quota-orb quota-card--${snapshot.status} quota-card--${tier}${idle ? " quota-orb--idle" : ""}`}
+      className={`quota-orb quota-card--${snapshot.status} quota-card--${tier}${displayingWeeklyAsPrimary ? " quota-orb--weekly" : ""}${idle ? " quota-orb--idle" : ""}`}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={() => onHover(false)}
       onMouseDown={(event) => { if (event.button === 0) void onDrag(); }}
-      aria-label={available ? t.availableLabel(primary) : localizedBackendMessage(snapshot.message, activeLanguage) ?? t.unavailableStatus}
+      aria-label={available ? (displayingWeeklyAsPrimary ? t.weeklyAvailableLabel(displayPercent!) : t.availableLabel(displayPercent!)) : balanceAvailable && displayBalance ? t.apiMetricLabel(apiMetricLabel, displayBalance) : localizedBackendMessage(snapshot.message, activeLanguage) ?? t.unavailableStatus}
     >
       <div className="aurora" aria-hidden="true" />
+      {available && displayingWeeklyAsPrimary ? (
+        <span className="orb-weekly-badge" aria-hidden="true">
+          <svg viewBox="0 0 55 17" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M7.3687 52.2894C13.0674 47.8486 17 38.4172 17 27.5C17 16.5828 13.0674 7.15141 7.3687 2.71063C3.88364 -0.00516105 0 3.58172 0 8L0 47C0 51.4183 3.88364 55.0052 7.3687 52.2894Z" fill="#61A1E2" fillOpacity=".8" transform="matrix(0 1 -1 0 55 0)" />
+          </svg>
+          <b>W</b>
+        </span>
+      ) : null}
       {available ? (
         <section className="orb-metric">
-          <span>{primary}</span>
+          <span>{displayPercent}</span>
           <small>%</small>
+        </section>
+      ) : balanceAvailable && displayBalance ? (
+        <section className="orb-metric orb-metric--balance" aria-label={t.apiMetricLabel(apiMetricLabel, displayBalance)}>
+          <span>{compactBalance}</span>
+          <small>{currencyBalance ? "USD" : "API"}</small>
         </section>
       ) : (
         <section className="orb-unavailable">
@@ -199,3 +272,6 @@ export const QuotaOrb = memo(function QuotaOrb({ snapshot, onDrag, onHover, lang
     </main>
   );
 });
+
+
+
