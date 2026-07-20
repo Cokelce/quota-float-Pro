@@ -106,6 +106,12 @@ https://github.com/Cokelce/quota-float-Pro/releases/latest/download/latest.json
 - `TAURI_SIGNING_PRIVATE_KEY`
 - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`，如果生成私钥时没有设置密码可以留空不配
 
+## 下载哪个包
+
+- Windows 用户：下载 GitHub Releases 里的 `x64-setup.exe` Windows 安装包。
+- Mac 用户：下载 GitHub Releases 里的 `universal.app.tar.gz` macOS Universal 包，适用于 Apple Silicon 和 Intel。
+- 所有下载都在 [GitHub Releases](https://github.com/Cokelce/quota-float-Pro/releases/latest) 页面。
+
 ## 上游项目
 
 - 上游项目：[change-42-yhmm/quota-float](https://github.com/change-42-yhmm/quota-float)
