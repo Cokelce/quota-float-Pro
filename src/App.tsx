@@ -24,6 +24,7 @@ export default function App() {
   const apiBalanceBaselines = useRef(loadApiBalanceBaselines());
   const consumptionTimers = useRef(new Map<string, number>());
   const collapseTimer = useRef<number | null>(null);
+  const updateNoticeTimer = useRef<number | null>(null);
   const hoverSequence = useRef(0);
   const language = normalizeLanguage(preferences.language);
   const t = copy[language];
@@ -39,8 +40,19 @@ export default function App() {
       availableMac: t.updateAvailableMac,
       failed: t.updateFailed,
     }, (message) => {
+      if (updateNoticeTimer.current !== null) {
+        window.clearTimeout(updateNoticeTimer.current);
+        updateNoticeTimer.current = null;
+      }
       setOperationError(message);
       if (message === t.updateFailed) setShowUpdateFallback(true);
+      else setShowUpdateFallback(false);
+      if (message === t.updateCurrent) {
+        updateNoticeTimer.current = window.setTimeout(() => {
+          setOperationError((current) => (current === message ? null : current));
+          updateNoticeTimer.current = null;
+        }, 1800);
+      }
     }, manual);
   }, [language, t]);
 
@@ -83,6 +95,7 @@ export default function App() {
       for (const timer of consumptionTimers.current.values()) window.clearTimeout(timer);
       consumptionTimers.current.clear();
       if (collapseTimer.current !== null) window.clearTimeout(collapseTimer.current);
+      if (updateNoticeTimer.current !== null) window.clearTimeout(updateNoticeTimer.current);
     };
   }, [refresh]);
 

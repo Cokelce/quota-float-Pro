@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "check:codex": "powershell -ExecutionPolicy Bypass -File scripts/check-codex-update.ps1",
+    "release:quick": "node scripts/release-quick.mjs",
     "test": "vitest run",
     "tauri": "tauri"
   },
