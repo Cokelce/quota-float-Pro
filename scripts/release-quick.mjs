@@ -16,10 +16,10 @@ if (args.includes('-h') || args.includes('--help')) {
 }
 
 const bumpArg = args.find((arg) => !arg.startsWith('-')) ?? 'patch';
-const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
 const files = {
   packageJson: path.join(repoRoot, 'package.json'),
+  packageLock: path.join(repoRoot, 'package-lock.json'),
   cargoToml: path.join(repoRoot, 'src-tauri', 'Cargo.toml'),
   tauriConf: path.join(repoRoot, 'src-tauri', 'tauri.conf.json'),
   cargoLock: path.join(repoRoot, 'src-tauri', 'Cargo.lock'),
@@ -82,20 +82,20 @@ function updateFile(filePath, pattern, replacement, label) {
 const packageJson = JSON.parse(readText(files.packageJson));
 const nextVersion = bumpVersion(packageJson.version, bumpArg);
 
-if (!dryRun) {
-  execFileSync(
-    npmCmd,
-    ['version', nextVersion, '--no-git-tag-version', '--allow-same-version'],
-    { cwd: repoRoot, stdio: 'inherit' },
-  );
-}
-
 updateFile(
   files.packageJson,
   /"version":\s*"[^"]+"/,
   `"version": "${nextVersion}"`,
   'package.json',
 );
+if (!dryRun) {
+  const packageLock = JSON.parse(readText(files.packageLock));
+  packageLock.version = nextVersion;
+  if (packageLock.packages?.[""]) {
+    packageLock.packages[""].version = nextVersion;
+  }
+  writeText(files.packageLock, `${JSON.stringify(packageLock, null, 2)}\n`);
+}
 updateFile(
   files.cargoToml,
   /(\[package\]\r?\nname = "quota-float"\r?\nversion = ")[^"]+(")/,
