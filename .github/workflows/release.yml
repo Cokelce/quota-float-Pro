@@ -46,11 +46,10 @@ jobs:
           releaseBody: |
             ## What's new
 
-            - Keeps the upstream Codex quota widget behavior for official account login.
-            - Adds API and third-party compatible balance monitoring for USD balances.
-            - Adds CC Switch and Codex++ provider detection.
-            - Adds theme presets, progress styles, and smoother floating widget interactions.
-            - Checks future updates from the quota-float-Pro GitHub Releases feed.
+            - Fixes the small white highlight dots that could appear on the compact orb.
+            - Clarifies which package Windows and Mac users should download in the README.
+            - Keeps CI from building release bundles on tag pushes; signed packages are now produced only by the Release workflow.
+            - Keeps automatic updates pointed at the quota-float-Pro GitHub Releases feed.
 
             ![Quota Float Pro theme preview](https://raw.githubusercontent.com/Cokelce/quota-float-Pro/main/docs/images/themes/theme-aurora.png)
 
