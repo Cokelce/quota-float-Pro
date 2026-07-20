@@ -9,7 +9,9 @@ interface Props {
   onProgressStyleChange: (style: ProgressStyle) => void;
   onToggleAlwaysOnTop: () => void;
   onToggleStayExpanded: () => void;
+  onToggleStatusBarProgress: () => void;
   onAutoRotateChange: (seconds: number) => void;
+  onExpandedSizeChange: (size: number) => void;
 }
 
 export function WidgetSettingsPanel({
@@ -19,7 +21,9 @@ export function WidgetSettingsPanel({
   onProgressStyleChange,
   onToggleAlwaysOnTop,
   onToggleStayExpanded,
+  onToggleStatusBarProgress,
   onAutoRotateChange,
+  onExpandedSizeChange,
 }: Props) {
   const language = normalizeLanguage(preferences.language);
   const t = copy[language];
@@ -131,6 +135,26 @@ export function WidgetSettingsPanel({
         </div>
 
         <div className="widget-settings-group">
+          <div className="widget-settings-label-row">
+            <div>
+              <strong>{t.expandedSizeSectionTitle}</strong>
+              <p>{t.expandedSizeSectionDescription}</p>
+            </div>
+            <output>{t.expandedSizeValue(preferences.expandedSize)}</output>
+          </div>
+          <input
+            className="widget-settings-range"
+            type="range"
+            min={260}
+            max={420}
+            step={10}
+            value={Math.min(420, Math.max(260, preferences.expandedSize))}
+            onChange={(event) => onExpandedSizeChange(Number(event.target.value))}
+            aria-label={t.expandedSizeSectionTitle}
+          />
+        </div>
+
+        <div className="widget-settings-group">
           <button type="button" className="widget-toggle-row" onClick={onToggleAlwaysOnTop} aria-pressed={preferences.alwaysOnTop}>
             <span className="widget-toggle-copy">
               <strong>{t.pinOn}</strong>
@@ -146,6 +170,15 @@ export function WidgetSettingsPanel({
               <small>{t.themeStayExpandedDescription}</small>
             </span>
             <span className={preferences.stayExpanded ? "widget-toggle-switch is-on" : "widget-toggle-switch"} aria-hidden="true">
+              <i />
+            </span>
+          </button>
+          <button type="button" className="widget-toggle-row" onClick={onToggleStatusBarProgress} aria-pressed={preferences.showStatusBarProgress}>
+            <span className="widget-toggle-copy">
+              <strong>{t.statusBarProgressTitle}</strong>
+              <small>{t.statusBarProgressDescription}</small>
+            </span>
+            <span className={preferences.showStatusBarProgress ? "widget-toggle-switch is-on" : "widget-toggle-switch"} aria-hidden="true">
               <i />
             </span>
           </button>

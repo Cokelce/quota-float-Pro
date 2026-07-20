@@ -112,6 +112,38 @@ https://github.com/Cokelce/quota-float-Pro/releases/latest/download/latest.json
 - Mac 用户：下载 GitHub Releases 里的 `universal.app.tar.gz` macOS Universal 包，适用于 Apple Silicon 和 Intel。
 - 所有下载都在 [GitHub Releases](https://github.com/Cokelce/quota-float-Pro/releases/latest) 页面。
 
+## Mac 详细使用方法
+
+1. 打开 [GitHub Releases](https://github.com/Cokelce/quota-float-Pro/releases/latest)。
+2. 下载 `Quota.Float.Pro_universal.app.tar.gz` 或名称里带 `universal.app.tar.gz` 的文件。
+3. 双击解压，得到 `Quota Float Pro.app`。
+4. 建议把 `Quota Float Pro.app` 拖到 `应用程序` 文件夹。
+5. 第一次启动如果提示“无法验证开发者”或“已阻止打开”，不要直接双击打开；在 Finder 里右键 `Quota Float Pro.app`，选择“打开”，再点一次“打开”确认。
+6. 如果仍然无法打开，可以在终端执行：
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/Quota Float Pro.app"
+```
+
+然后再从 `应用程序` 里打开。
+
+### Mac 上怎么显示
+
+- 普通模式：会显示桌面悬浮小圆球，鼠标移上去展开卡片。
+- 开启“状态栏进度条”后：桌面悬浮圆球会隐藏，进度显示在 macOS 顶部菜单栏。
+- 鼠标移动到菜单栏进度图标上，会显示迷你额度卡片。
+- 颜色会跟额度同步变化：健康、警告、危急。
+
+### Mac 上读取额度的前提
+
+- 官方账号：需要本机已经登录 Codex Desktop / Codex。
+- API 或第三方兼容 API：需要本机已有 Codex、CC Switch 或 Codex++ 的配置。
+- 如果第三方接口没有提供 USD 余额字段，小组件会提示未检测到余额接口，不会伪造余额。
+
+### Mac 自动更新
+
+应用启动后会自动检查 GitHub Releases 的更新。也可以右键菜单栏图标，点击 `Check for updates` 手动检查。
+
 ## 上游项目
 
 - 上游项目：[change-42-yhmm/quota-float](https://github.com/change-42-yhmm/quota-float)

@@ -31,6 +31,25 @@
         "visible": true
       },
       {
+        "label": "statusbar",
+        "title": "Quota Progress",
+        "url": "/?statusbar",
+        "width": 210,
+        "height": 118,
+        "minWidth": 210,
+        "minHeight": 118,
+        "maxWidth": 210,
+        "maxHeight": 118,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "backgroundColor": "#00000000",
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": false,
+        "visible": false
+      },
+      {
         "label": "settings",
         "title": "小组件设置",
         "url": "/?settings",

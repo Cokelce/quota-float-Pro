@@ -93,6 +93,7 @@ export const QuotaCard = memo(function QuotaCard({
   const displayWindow = snapshot.shortWindow ?? snapshot.weeklyWindow;
   const displayingWeeklyAsPrimary = primary === null && weekly !== null;
   const balanceAvailable = displayPercent === null && balance !== null && snapshot.status === "ok";
+  const compactLayout = preferences.expandedSize <= 280;
   const staleAge = Date.now() - new Date(snapshot.updatedAt).getTime();
   const staleExpired = snapshot.status === "stale" && staleAge > 30 * 60_000;
   const available = snapshot.status === "ok" || (snapshot.status === "stale" && !staleExpired);
@@ -116,7 +117,7 @@ export const QuotaCard = memo(function QuotaCard({
 
   return (
     <main
-      className={`quota-card quota-card--${snapshot.status} quota-card--${tier}${isClosing ? " quota-card--closing" : ""}`}
+      className={`quota-card quota-card--${snapshot.status} quota-card--${tier}${compactLayout ? " quota-card--compact" : ""}${balanceAvailable ? " quota-card--balance" : ""}${isClosing ? " quota-card--closing" : ""}`}
       onMouseEnter={() => onHover(true)}
       onMouseLeave={() => onHover(false)}
     >
@@ -132,7 +133,7 @@ export const QuotaCard = memo(function QuotaCard({
           <nav className="card-actions" aria-label={t.controls} onMouseDown={(event) => event.stopPropagation()}>
             {providerCount > 1 ? <button onClick={onPrevious} aria-label={t.servicePrevious}><ArrowUp /></button> : null}
             {providerCount > 1 ? <button onClick={onNext} aria-label={t.serviceNext}><ArrowDown /></button> : null}
-            <span className={`usage-indicator usage-indicator--${indicatorState}`} role="status" aria-label={indicatorLabel} title={indicatorLabel}><i /></span>
+            <button type="button" className={`usage-indicator usage-indicator--${indicatorState}`} onClick={onRefresh} disabled={!onRefresh} aria-label={t.refreshQuota} title={`${indicatorLabel} · ${t.refreshQuota}`}><i /></button>
             <button className={preferences.stayExpanded ? "expand-button expand-button--active" : "expand-button"} onClick={onToggleStayExpanded} aria-pressed={preferences.stayExpanded} aria-label={preferences.stayExpanded ? t.keepExpandedOff : t.keepExpandedOn} title={preferences.stayExpanded ? t.keepExpandedOff : t.keepExpandedOn}>
               {preferences.stayExpanded ? <ArrowsInSimple weight="bold" /> : <ArrowsOutSimple />}
             </button>

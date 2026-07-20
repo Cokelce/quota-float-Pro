@@ -33,8 +33,10 @@ export interface WidgetPreferences {
   stayExpanded: boolean;
   pinnedProvider: ProviderId | null;
   autoRotateSeconds: number;
+  expandedSize: number;
   language: Language;
   theme: ThemeName;
   progressStyle: ProgressStyle;
+  showStatusBarProgress: boolean;
 }
 

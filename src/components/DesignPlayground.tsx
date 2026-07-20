@@ -16,7 +16,7 @@ const preview: ProviderSnapshot = {
   message: null,
 };
 const themeNames: ThemeName[] = ["aurora", "dark", "qingci", "bamboo", "peacock", "lvyun", "xinghe"];
-const preferences: WidgetPreferences = { locked: false, alwaysOnTop: true, stayExpanded: false, pinnedProvider: "codex", autoRotateSeconds: 12, language: "en", theme: "aurora", progressStyle: "solid" };
+const preferences: WidgetPreferences = { locked: false, alwaysOnTop: true, stayExpanded: false, showStatusBarProgress: false, pinnedProvider: "codex", autoRotateSeconds: 12, expandedSize: 320, language: "en", theme: "aurora", progressStyle: "solid" };
 
 interface Values {
   radius: number;

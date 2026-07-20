@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { QuotaCard, QuotaOrb } from "./components/QuotaCard";
-import { fetchSnapshots, getPreferences, listenDesktopEvents, setAlwaysOnTop, setWidgetExpanded, startDragging, updatePreferences } from "./lib/bridge";
-import { needsFastRefresh } from "./lib/format";
+import { fetchSnapshots, getPreferences, listenDesktopEvents, publishTrayPreview, setAlwaysOnTop, setTrayProgress, setWidgetExpanded, setWidgetVisible, startDragging, updatePreferences } from "./lib/bridge";
+import { clampPercent, needsFastRefresh, quotaTier } from "./lib/format";
 import { checkForAppUpdate, openReleasePage } from "./lib/appUpdate";
 import { copy, normalizeLanguage } from "./lib/i18n";
 import { applyApiBalanceProgress, loadApiBalanceBaselines, mergeSnapshots, saveApiBalanceBaselines } from "./lib/snapshots";
 import type { ProviderSnapshot, WidgetPreferences } from "./types";
 
-const DEFAULT_PREFS: WidgetPreferences = { locked: false, alwaysOnTop: true, stayExpanded: false, pinnedProvider: null, autoRotateSeconds: 12, language: "zh-CN", theme: "aurora", progressStyle: "solid" };
+const DEFAULT_PREFS: WidgetPreferences = { locked: false, alwaysOnTop: true, stayExpanded: false, showStatusBarProgress: false, pinnedProvider: null, autoRotateSeconds: 12, expandedSize: 320, language: "zh-CN", theme: "aurora", progressStyle: "solid" };
 
 export default function App() {
   const [snapshots, setSnapshots] = useState<ProviderSnapshot[]>([]);
@@ -25,9 +25,23 @@ export default function App() {
   const consumptionTimers = useRef(new Map<string, number>());
   const collapseTimer = useRef<number | null>(null);
   const updateNoticeTimer = useRef<number | null>(null);
+  const operationNoticeTimer = useRef<number | null>(null);
   const hoverSequence = useRef(0);
   const language = normalizeLanguage(preferences.language);
   const t = copy[language];
+
+  const showTransientOperationNotice = useCallback((message: string, ttl = 3500) => {
+    if (operationNoticeTimer.current !== null) {
+      window.clearTimeout(operationNoticeTimer.current);
+      operationNoticeTimer.current = null;
+    }
+    setShowUpdateFallback(false);
+    setOperationError(message);
+    operationNoticeTimer.current = window.setTimeout(() => {
+      setOperationError((current) => (current === message ? null : current));
+      operationNoticeTimer.current = null;
+    }, ttl);
+  }, []);
 
   const checkUpdate = useCallback((manual = false) => {
     setShowUpdateFallback(false);
@@ -90,14 +104,15 @@ export default function App() {
 
   useEffect(() => {
     void refresh(true);
-    void getPreferences().then((value) => setPreferences({ ...DEFAULT_PREFS, ...value, language: normalizeLanguage(value.language) })).catch(() => setOperationError("Unable to read settings. Defaults are in use."));
+    void getPreferences().then((value) => setPreferences({ ...DEFAULT_PREFS, ...value, language: normalizeLanguage(value.language) })).catch(() => showTransientOperationNotice("Unable to read settings. Defaults are in use."));
     return () => {
       for (const timer of consumptionTimers.current.values()) window.clearTimeout(timer);
       consumptionTimers.current.clear();
       if (collapseTimer.current !== null) window.clearTimeout(collapseTimer.current);
       if (updateNoticeTimer.current !== null) window.clearTimeout(updateNoticeTimer.current);
+      if (operationNoticeTimer.current !== null) window.clearTimeout(operationNoticeTimer.current);
     };
-  }, [refresh]);
+  }, [refresh, showTransientOperationNotice]);
 
   useEffect(() => {
     let cancelled = false;
@@ -108,9 +123,9 @@ export default function App() {
       onUpdate: () => checkUpdate(true),
     }).then((value) => {
       if (cancelled) value(); else cleanup = value;
-    }).catch(() => setOperationError("Desktop event listener failed to start."));
+    }).catch(() => showTransientOperationNotice("Desktop event listener failed to start."));
     return () => { cancelled = true; cleanup(); };
-  }, [checkUpdate, refresh]);
+  }, [checkUpdate, refresh, showTransientOperationNotice]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => checkUpdate(false), 12_000);
@@ -148,19 +163,62 @@ export default function App() {
     ? snapshots.find((item) => item.provider === preferences.pinnedProvider) ?? snapshots[0]
     : snapshots[activeIndex % Math.max(1, snapshots.length)];
 
+  const trayWindowPercent = current?.shortWindow
+    ? clampPercent(current.shortWindow.remainingPercent)
+    : current?.weeklyWindow
+      ? clampPercent(current.weeklyWindow.remainingPercent)
+      : null;
+  const trayBalance = current?.balance?.trim() || null;
+  const trayBalancePercent = current?.balancePercent == null ? 100 : clampPercent(current.balancePercent);
+  const trayPercent = trayWindowPercent ?? (trayBalance ? trayBalancePercent : 0);
+  const trayTier = current ? quotaTier(trayBalance ? trayBalancePercent : trayWindowPercent) : "stale";
+  const trayTooltip = current
+    ? (trayWindowPercent !== null
+      ? (current.shortWindow ? t.availableLabel(trayWindowPercent) : t.weeklyAvailableLabel(trayWindowPercent))
+      : trayBalance
+        ? `${current.balanceLabel?.trim() || t.apiBalance}: ${trayBalance}`
+        : current.message ?? t.unavailableStatus)
+    : t.loadingQuota;
+  const trayPreview = useMemo(() => current ? {
+    snapshot: current,
+    preferences,
+    percent: trayPercent,
+    tier: trayTier,
+    label: trayWindowPercent !== null
+      ? (current.shortWindow ? t.shortRemaining : t.weeklyShortRemaining)
+      : trayBalance
+        ? current.balanceLabel?.trim() || t.apiBalance
+        : t.unavailableStatus,
+    value: trayWindowPercent !== null ? `${trayWindowPercent}%` : trayBalance ?? "--",
+    detail: trayBalance ? `${trayBalancePercent}%` : trayTooltip,
+  } : null, [current, preferences, t, trayBalance, trayBalancePercent, trayPercent, trayTier, trayTooltip, trayWindowPercent]);
+
+  useEffect(() => {
+    void setTrayProgress(preferences.showStatusBarProgress, trayPercent, trayTooltip, trayTier).catch(() => undefined);
+  }, [preferences.showStatusBarProgress, trayPercent, trayTooltip, trayTier]);
+
+  useEffect(() => {
+    void setWidgetVisible(!preferences.showStatusBarProgress).catch(() => undefined);
+  }, [preferences.showStatusBarProgress]);
+
+  useEffect(() => {
+    if (!preferences.showStatusBarProgress || !trayPreview) return;
+    void publishTrayPreview(trayPreview).catch(() => undefined);
+  }, [preferences.showStatusBarProgress, trayPreview]);
+
   const savePreferences = useCallback((next: WidgetPreferences) => {
     const previous = preferences;
     setPreferences(next);
     setOperationError(null);
-    void updatePreferences(next).catch(() => { setPreferences(previous); setOperationError("Settings could not be saved. Previous state restored."); });
-  }, [preferences]);
+    void updatePreferences(next).catch(() => { setPreferences(previous); showTransientOperationNotice("Settings could not be saved. Previous state restored."); });
+  }, [preferences, showTransientOperationNotice]);
 
   const toggleAlwaysOnTop = useCallback(() => {
     setOperationError(null);
     void setAlwaysOnTop(!preferences.alwaysOnTop)
       .then((value) => setPreferences({ ...DEFAULT_PREFS, ...value, language: normalizeLanguage(value.language) }))
-      .catch(() => setOperationError("Always-on-top toggle failed."));
-  }, [preferences.alwaysOnTop]);
+      .catch(() => showTransientOperationNotice("Always-on-top toggle failed."));
+  }, [preferences.alwaysOnTop, showTransientOperationNotice]);
 
   const handleHover = useCallback((value: boolean) => {
     if (collapseTimer.current !== null) {
@@ -174,13 +232,18 @@ export default function App() {
       const sequence = ++hoverSequence.current;
       setClosing(false);
       setCompact(false);
-      void setWidgetExpanded(true)
+      void setWidgetExpanded(true, { width: preferences.expandedSize, height: preferences.expandedSize })
+        .then(() => {
+          if (hoverSequence.current !== sequence) return;
+        })
         .catch(() => {
-          if (hoverSequence.current === sequence) setOperationError("Widget expand failed.");
+          setCompact(true);
+          if (hoverSequence.current === sequence) showTransientOperationNotice("Widget expand failed.");
         });
       return;
     }
     const sequence = ++hoverSequence.current;
+    if (compact) return;
     setClosing(true);
     collapseTimer.current = window.setTimeout(() => {
       if (hoverSequence.current !== sequence) return;
@@ -195,24 +258,26 @@ export default function App() {
         .catch(() => {
           setClosing(false);
           setCompact(true);
-          setOperationError("Widget collapse failed.");
+          showTransientOperationNotice("Widget collapse failed.");
         });
     }, 130);
-  }, [preferences.stayExpanded, refresh]);
+  }, [compact, preferences.expandedSize, preferences.stayExpanded, refresh, showTransientOperationNotice]);
 
   useEffect(() => {
     if (!preferences.stayExpanded) return;
     if (collapseTimer.current !== null) window.clearTimeout(collapseTimer.current);
     setClosing(false);
     setCompact(false);
-    void setWidgetExpanded(true).catch(() => setOperationError("Widget expand failed."));
-  }, [preferences.stayExpanded]);
+    void setWidgetExpanded(true, { width: preferences.expandedSize, height: preferences.expandedSize }).catch(() => showTransientOperationNotice("Widget expand failed."));
+  }, [preferences.expandedSize, preferences.stayExpanded, showTransientOperationNotice]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = preferences.theme;
   }, [preferences.theme]);
 
   if (!current) return <div className="loading-card" aria-label={t.loadingQuota}><span /><span /><span /></div>;
+
+  if (preferences.showStatusBarProgress) return null;
 
   if (compact) {
     return <QuotaOrb snapshot={current} language={language} onDrag={() => startDragging()} onHover={handleHover} />;

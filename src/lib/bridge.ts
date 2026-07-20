@@ -1,6 +1,6 @@
 import type { ProviderSnapshot, WidgetPreferences } from "../types";
 
-const defaultPreferences: WidgetPreferences = { locked: false, alwaysOnTop: true, stayExpanded: false, pinnedProvider: null, autoRotateSeconds: 12, language: "zh-CN", theme: "aurora", progressStyle: "solid" };
+const defaultPreferences: WidgetPreferences = { locked: false, alwaysOnTop: true, stayExpanded: false, showStatusBarProgress: false, pinnedProvider: null, autoRotateSeconds: 12, expandedSize: 320, language: "zh-CN", theme: "aurora", progressStyle: "solid" };
 
 const mockSnapshot: ProviderSnapshot = {
   provider: "codex",
@@ -17,6 +17,10 @@ const mockSnapshot: ProviderSnapshot = {
 };
 
 let widgetTransition: Promise<void> = Promise.resolve();
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
 
 export interface WidgetExpandSize {
   width: number;
@@ -40,7 +44,16 @@ export async function fetchSnapshots(force = false): Promise<ProviderSnapshot[]>
 export async function getPreferences(): Promise<WidgetPreferences> {
   if (!isTauri()) return defaultPreferences;
   const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<WidgetPreferences>("get_preferences");
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      return await invoke<WidgetPreferences>("get_preferences");
+    } catch (error) {
+      lastError = error;
+      await wait(120);
+    }
+  }
+  throw lastError;
 }
 
 export async function updatePreferences(value: WidgetPreferences): Promise<void> {
@@ -112,6 +125,30 @@ export function setWidgetExpanded(expanded: boolean, logicalSize?: WidgetExpandS
     } : null;
     await invoke("expand_widget", logicalSize ? { workArea, logicalSize } : { workArea });
   });
+}
+
+export async function setStatusBarProgressVisible(visible: boolean): Promise<void> {
+  if (!isTauri()) return;
+  const { invoke } = await import("@tauri-apps/api/core");
+  await invoke("set_status_bar_progress_visible", { visible });
+}
+
+export async function setTrayProgress(visible: boolean, percent: number, tooltip: string, tier: string): Promise<void> {
+  if (!isTauri()) return;
+  const { invoke } = await import("@tauri-apps/api/core");
+  await invoke("set_tray_progress", { visible, percent, tooltip, tier });
+}
+
+export async function setWidgetVisible(visible: boolean): Promise<void> {
+  if (!isTauri()) return;
+  const { invoke } = await import("@tauri-apps/api/core");
+  await invoke("set_widget_visible", { visible });
+}
+
+export async function publishTrayPreview(payload: unknown): Promise<void> {
+  if (!isTauri()) return;
+  const { emitTo } = await import("@tauri-apps/api/event");
+  await emitTo("statusbar", "tray-preview-updated", payload);
 }
 
 export async function listenDesktopEvents(handlers: {

@@ -14,6 +14,7 @@ use models::UsageWindow;
 use models::{ProviderSnapshot, WidgetPreferences};
 use serde::Deserialize;
 use tauri::{
+    image::Image,
     menu::{CheckMenuItem, Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     webview::Color,
@@ -24,12 +25,14 @@ use tauri_plugin_window_state::Builder as WindowStateBuilder;
 
 const COLLAPSED_LOGICAL_SIZE: f64 = 80.0;
 const EXPANDED_LOGICAL_SIZE: f64 = 320.0;
+const EXPANDED_MIN_LOGICAL_SIZE: f64 = 260.0;
 const SETTINGS_MAX_LOGICAL_WIDTH: f64 = 500.0;
 const SETTINGS_MAX_LOGICAL_HEIGHT: f64 = 560.0;
 const EDGE_SAFE_INSET_LOGICAL: f64 = 0.0;
 const SNAP_THRESHOLD_LOGICAL: f64 = 24.0;
 const POSITION_EPSILON: u32 = 2;
-
+const TRAY_PREVIEW_WIDTH: f64 = 210.0;
+const TRAY_PREVIEW_HEIGHT: f64 = 118.0;
 #[derive(Clone, Copy)]
 enum HorizontalDock {
     Left,
@@ -252,6 +255,9 @@ fn clamp_position_to_monitor(
 }
 
 fn logical_to_physical(value: f64, scale_factor: f64) -> u32 {
+    if value <= 0.0 {
+        return 0;
+    }
     (value * scale_factor).round().max(1.0) as u32
 }
 
@@ -275,14 +281,14 @@ fn expanded_window_size(
         .map(|value| {
             value
                 .width
-                .clamp(EXPANDED_LOGICAL_SIZE, SETTINGS_MAX_LOGICAL_WIDTH)
+                .clamp(EXPANDED_MIN_LOGICAL_SIZE, SETTINGS_MAX_LOGICAL_WIDTH)
         })
         .unwrap_or(EXPANDED_LOGICAL_SIZE);
     let height = logical_size
         .map(|value| {
             value
                 .height
-                .clamp(EXPANDED_LOGICAL_SIZE, SETTINGS_MAX_LOGICAL_HEIGHT)
+                .clamp(EXPANDED_MIN_LOGICAL_SIZE, SETTINGS_MAX_LOGICAL_HEIGHT)
         })
         .unwrap_or(EXPANDED_LOGICAL_SIZE);
     PhysicalSize::new(
@@ -592,6 +598,170 @@ fn apply_widget_event_window_region(window: &tauri::Window) {
 #[cfg(not(windows))]
 fn apply_widget_event_window_region(_: &tauri::Window) {}
 
+fn tray_progress_color(tier: &str) -> (u8, u8, u8) {
+    match tier {
+        "caution" => (255, 154, 231),
+        "critical" => (255, 111, 181),
+        "signed_out" | "unavailable" | "stale" => (148, 163, 184),
+        _ => (255, 120, 242),
+    }
+}
+
+fn set_pixel(rgba: &mut [u8], size: u32, x: u32, y: u32, color: (u8, u8, u8, u8)) {
+    if x >= size || y >= size {
+        return;
+    }
+    let index = ((y * size + x) * 4) as usize;
+    rgba[index] = color.0;
+    rgba[index + 1] = color.1;
+    rgba[index + 2] = color.2;
+    rgba[index + 3] = color.3;
+}
+
+fn draw_rounded_rect(
+    rgba: &mut [u8],
+    size: u32,
+    left: u32,
+    top: u32,
+    width: u32,
+    height: u32,
+    radius: i32,
+    color: (u8, u8, u8, u8),
+) {
+    let right = left + width;
+    let bottom = top + height;
+    for y in top..bottom {
+        for x in left..right {
+            let dx = if x < left + radius as u32 {
+                left + radius as u32 - x
+            } else if x >= right.saturating_sub(radius as u32) {
+                x - (right - radius as u32 - 1)
+            } else {
+                0
+            } as i32;
+            let dy = if y < top + radius as u32 {
+                top + radius as u32 - y
+            } else if y >= bottom.saturating_sub(radius as u32) {
+                y - (bottom - radius as u32 - 1)
+            } else {
+                0
+            } as i32;
+            if dx == 0 || dy == 0 || dx * dx + dy * dy <= radius * radius {
+                set_pixel(rgba, size, x, y, color);
+            }
+        }
+    }
+}
+
+fn tray_progress_icon(percent: f64, tier: &str) -> Image<'static> {
+    const WIDTH: u32 = 42;
+    const HEIGHT: u32 = 32;
+    let mut rgba = vec![0; (WIDTH * HEIGHT * 4) as usize];
+    let percent = percent.clamp(0.0, 100.0);
+    let fill_width = if percent <= 0.0 {
+        0
+    } else {
+        ((40.0 * percent / 100.0).round() as u32).clamp(20, 40)
+    };
+    let (r, g, b) = tray_progress_color(tier);
+
+    draw_rounded_rect(&mut rgba, WIDTH, 0, 9, 42, 13, 6, (255, 255, 255, 135));
+    draw_rounded_rect(&mut rgba, WIDTH, 1, 10, 40, 11, 5, (18, 24, 40, 238));
+    draw_rounded_rect(&mut rgba, WIDTH, 2, 11, 38, 9, 4, (74, 82, 102, 172));
+    draw_rounded_rect(&mut rgba, WIDTH, 2, 11, 38, 1, 1, (255, 255, 255, 90));
+    if fill_width > 0 {
+        draw_rounded_rect(&mut rgba, WIDTH, 1, 10, fill_width, 11, 5, (r, g, b, 255));
+        draw_rounded_rect(&mut rgba, WIDTH, 2, 11, fill_width.saturating_sub(2), 3, 2, (255, 255, 255, 112));
+        draw_rounded_rect(&mut rgba, WIDTH, 2, 18, fill_width.saturating_sub(2), 2, 1, (0, 0, 0, 38));
+    }
+
+    Image::new_owned(rgba, WIDTH, HEIGHT)
+}
+
+fn set_progress_tray_icon(
+    app: &AppHandle,
+    visible: bool,
+    percent: f64,
+    _tooltip: &str,
+    tier: &str,
+) -> Result<(), String> {
+    let Some(tray) = app.tray_by_id("main") else {
+        return Ok(());
+    };
+    if visible {
+        tray.set_icon(Some(tray_progress_icon(percent, tier)))
+            .map_err(|_| "failed to update tray progress icon".to_string())?;
+        let _ = tray.set_tooltip(None::<String>);
+        return Ok(());
+    }
+    if let Some(icon) = app.default_window_icon() {
+        let _ = tray.set_icon(Some(icon.clone()));
+    }
+    let _ = tray.set_tooltip(Some("Quota Float Pro"));
+    Ok(())
+}
+
+fn set_widget_visibility(app: &AppHandle, visible: bool) {
+    if let Some(window) = app.get_webview_window("widget") {
+        if visible {
+            let _ = window.show();
+        } else {
+            let _ = window.hide();
+        }
+    }
+}
+
+#[tauri::command]
+fn set_widget_visible(visible: bool, app: AppHandle) -> Result<(), String> {
+    set_widget_visibility(&app, visible);
+    Ok(())
+}
+
+fn hide_tray_preview(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("statusbar") {
+        let _ = window.hide();
+    }
+}
+
+fn show_tray_preview(app: &AppHandle, rect: tauri::Rect) {
+    let Some(window) = app.get_webview_window("statusbar") else {
+        return;
+    };
+    let visible = app
+        .try_state::<AppState>()
+        .and_then(|state| state.preferences.lock().ok().map(|prefs| prefs.show_status_bar_progress))
+        .unwrap_or(false);
+    if !visible {
+        let _ = window.hide();
+        return;
+    }
+    let scale_factor = window.scale_factor().unwrap_or(1.0);
+    let width = logical_to_physical(TRAY_PREVIEW_WIDTH, scale_factor);
+    let height = logical_to_physical(TRAY_PREVIEW_HEIGHT, scale_factor);
+    let rect_position = rect.position.to_physical::<i32>(scale_factor);
+    let rect_size = rect.size.to_physical::<u32>(scale_factor);
+    let anchor_x = rect_position.x as f64 + rect_size.width as f64 / 2.0;
+    let mut x = (anchor_x - width as f64 / 2.0).round() as i32;
+    let mut y = (rect_position.y as f64 - height as f64 - 10.0).round() as i32;
+
+    if let Ok(Some(monitor)) = app.monitor_from_point(rect_position.x as f64, rect_position.y as f64) {
+        let monitor_position = monitor.position();
+        let monitor_size = monitor.size();
+        x = x.clamp(
+            monitor_position.x + 4,
+            monitor_position.x + monitor_size.width as i32 - width as i32 - 4,
+        );
+        if y < monitor_position.y + 4 {
+            y = (rect_position.y as f64 + rect_size.height as f64 + 10.0).round() as i32;
+        }
+    }
+
+    let _ = window.set_size(PhysicalSize::new(width, height));
+    let _ = window.set_position(PhysicalPosition::new(x, y));
+    let _ = window.show();
+    let _ = window.set_focus();
+}
+
 #[tauri::command]
 fn expand_widget(
     work_area: Option<WorkAreaPayload>,
@@ -674,6 +844,8 @@ mod geometry_tests {
     fn window_size_includes_the_transparent_safe_inset() {
         assert_eq!(window_size_for_visual_size(80, 4), 88);
         assert_eq!(widget_window_size(320.0, 1.5, 6), 492);
+        assert_eq!(logical_to_physical(0.0, 1.5), 0);
+        assert_eq!(widget_window_size(80.0, 1.0, logical_to_physical(0.0, 1.0)), 80);
     }
 
     #[test]
@@ -720,6 +892,7 @@ mod geometry_tests {
         );
         assert_eq!(position, PhysicalPosition::new(1510, 660));
     }
+
 }
 
 #[tauri::command]
@@ -938,6 +1111,11 @@ fn set_preferences(
         .preferences
         .lock()
         .map_err(|_| "settings unavailable".to_string())? = preferences.clone();
+    let _ = set_status_bar_progress_visible(
+        preferences.show_status_bar_progress,
+        None,
+        app.clone(),
+    );
     let _ = app.emit("preferences-changed", preferences);
     Ok(())
 }
@@ -1006,6 +1184,28 @@ fn set_widget_always_on_top(
     Ok(next)
 }
 
+#[tauri::command]
+fn set_status_bar_progress_visible(
+    visible: bool,
+    _work_area: Option<WorkAreaPayload>,
+    app: AppHandle,
+) -> Result<(), String> {
+    hide_tray_preview(&app);
+    set_widget_visibility(&app, !visible);
+    set_progress_tray_icon(&app, visible, 100.0, "额度读取中", "healthy")
+}
+
+#[tauri::command]
+fn set_tray_progress(
+    visible: bool,
+    percent: f64,
+    tooltip: String,
+    tier: String,
+    app: AppHandle,
+) -> Result<(), String> {
+    set_progress_tray_icon(&app, visible, percent, &tooltip, &tier)
+}
+
 fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     let show = MenuItem::with_id(app, "show", "Show / Hide", true, None::<&str>)?;
     let refresh = MenuItem::with_id(app, "refresh", "Refresh now", true, None::<&str>)?;
@@ -1069,6 +1269,13 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     builder
         .on_menu_event(move |app, event| match event.id.as_ref() {
             "show" => {
+                let status_visible = app
+                    .try_state::<AppState>()
+                    .and_then(|state| state.preferences.lock().ok().map(|prefs| prefs.show_status_bar_progress))
+                    .unwrap_or(false);
+                if status_visible {
+                    return;
+                }
                 if let Some(window) = app.get_webview_window("widget") {
                     if window.is_visible().unwrap_or(false) {
                         let _ = window.hide();
@@ -1208,6 +1415,7 @@ pub fn run() {
         .plugin(
             WindowStateBuilder::default()
                 .skip_initial_state("settings")
+                .skip_initial_state("statusbar")
                 .build(),
         )
         .setup(|app| {
@@ -1237,6 +1445,16 @@ pub fn run() {
                     let _ = window.set_skip_taskbar(false);
                 }
             }
+            if preferences.show_status_bar_progress {
+                let _ = set_progress_tray_icon(
+                    app.handle(),
+                    true,
+                    100.0,
+                    "额度读取中",
+                    "healthy",
+                );
+                set_widget_visibility(app.handle(), false);
+            }
             if preferences.locked {
                 let _ = apply_lock(app.handle(), true);
             }
@@ -1254,6 +1472,15 @@ pub fn run() {
                 apply_widget_window_region(&window);
                 let _ = window.set_always_on_top(preferences.always_on_top);
             }
+            if let Some(window) = app.get_webview_window("statusbar") {
+                let _ = window.set_background_color(Some(Color(0, 0, 0, 0)));
+                let _ = window.set_always_on_top(true);
+                let _ = set_status_bar_progress_visible(
+                    preferences.show_status_bar_progress,
+                    None,
+                    app.handle().clone(),
+                );
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -1266,19 +1493,35 @@ pub fn run() {
             get_preferences,
             set_preferences,
             set_widget_locked,
-            set_widget_always_on_top
+            set_widget_always_on_top,
+            set_status_bar_progress_visible,
+            set_tray_progress,
+            set_widget_visible
         ])
         .on_tray_icon_event(|app, event| {
-            if let TrayIconEvent::Click {
-                button: MouseButton::Left,
-                button_state: MouseButtonState::Up,
-                ..
-            } = event
-            {
-                if let Some(window) = app.get_webview_window("widget") {
-                    let _ = window.show();
-                    let _ = window.set_focus();
+            match event {
+                TrayIconEvent::Enter { rect, .. } | TrayIconEvent::Move { rect, .. } => {
+                    show_tray_preview(app, rect);
                 }
+                TrayIconEvent::Leave { .. } => hide_tray_preview(app),
+                TrayIconEvent::Click {
+                    button: MouseButton::Left,
+                    button_state: MouseButtonState::Up,
+                    rect,
+                    ..
+                } => {
+                    let status_visible = app
+                        .try_state::<AppState>()
+                        .and_then(|state| state.preferences.lock().ok().map(|prefs| prefs.show_status_bar_progress))
+                        .unwrap_or(false);
+                    if status_visible {
+                        show_tray_preview(app, rect);
+                    } else if let Some(window) = app.get_webview_window("widget") {
+                        let _ = window.show();
+                        let _ = window.set_focus();
+                    }
+                }
+                _ => {}
             }
         })
         .on_window_event(|window, event| {
@@ -1286,6 +1529,11 @@ pub fn run() {
                 apply_widget_event_window_region(window);
             }
             if let WindowEvent::CloseRequested { api, .. } = event {
+                if window.label() == "statusbar" {
+                    api.prevent_close();
+                    let _ = window.hide();
+                    return;
+                }
                 api.prevent_close();
                 let _ = window.hide();
             }

@@ -46,9 +46,11 @@ jobs:
           releaseBody: |
             ## What's new
 
-            - Fixes the update notice staying visible after "Check for updates" reports the app is already up to date.
-            - Adds a one-command release helper for quicker future builds.
-            - Keeps automatic updates pointed at the quota-float-Pro GitHub Releases feed.
+            - Adds a tray/menu-bar progress mode that can hide the desktop floating card.
+            - Shows a compact quota preview card when hovering the tray/menu-bar progress icon.
+            - Improves tray progress colors so they follow healthy, warning, and critical quota states.
+            - Adds custom expanded-card sizing and tighter compact-card layout.
+            - Expands the README with detailed macOS download, first-run, and menu-bar usage steps.
 
             ![Quota Float Pro theme preview](https://raw.githubusercontent.com/Cokelce/quota-float-Pro/main/docs/images/themes/theme-aurora.png)
 

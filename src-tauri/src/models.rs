@@ -58,12 +58,16 @@ pub struct WidgetPreferences {
     pub stay_expanded: bool,
     pub pinned_provider: Option<String>,
     pub auto_rotate_seconds: u64,
+    #[serde(default = "default_expanded_size")]
+    pub expanded_size: u32,
     #[serde(default = "default_language")]
     pub language: String,
     #[serde(default = "default_theme")]
     pub theme: String,
     #[serde(default = "default_progress_style")]
     pub progress_style: String,
+    #[serde(default)]
+    pub show_status_bar_progress: bool,
 }
 
 fn default_always_on_top() -> bool {
@@ -78,6 +82,9 @@ fn default_theme() -> String {
 fn default_progress_style() -> String {
     "solid".into()
 }
+fn default_expanded_size() -> u32 {
+    320
+}
 
 impl Default for WidgetPreferences {
     fn default() -> Self {
@@ -87,9 +94,11 @@ impl Default for WidgetPreferences {
             stay_expanded: false,
             pinned_provider: None,
             auto_rotate_seconds: 12,
+            expanded_size: default_expanded_size(),
             language: default_language(),
             theme: default_theme(),
             progress_style: default_progress_style(),
+            show_status_bar_progress: false,
         }
     }
 }
@@ -97,6 +106,7 @@ impl Default for WidgetPreferences {
 impl WidgetPreferences {
     pub fn normalized(mut self) -> Self {
         self.auto_rotate_seconds = self.auto_rotate_seconds.clamp(5, 300);
+        self.expanded_size = self.expanded_size.clamp(260, 420);
         if self.pinned_provider.as_deref() != Some("codex") {
             self.pinned_provider = None;
         }

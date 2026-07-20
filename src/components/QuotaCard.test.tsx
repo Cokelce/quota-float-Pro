@@ -10,8 +10,10 @@ const preferences: WidgetPreferences = {
   locked: false,
   alwaysOnTop: true,
   stayExpanded: false,
+  showStatusBarProgress: false,
   pinnedProvider: null,
   autoRotateSeconds: 12,
+  expandedSize: 320,
   language: "zh-CN",
   theme: "aurora",
   progressStyle: "solid",
@@ -94,5 +96,24 @@ describe("QuotaCard API balance styling", () => {
     );
 
     expect(container.querySelector(".progress")?.classList.contains("progress--segmented")).toBe(true);
+  });
+
+  it("uses compact layout at the smaller expanded size", () => {
+    const { container } = render(
+      <QuotaCard
+        snapshot={apiBalance}
+        preferences={{ ...preferences, expandedSize: 260 }}
+        providerCount={1}
+        onPrevious={() => {}}
+        onNext={() => {}}
+        onTogglePin={() => {}}
+        onLock={() => {}}
+        onToggleStayExpanded={() => {}}
+        onDrag={() => {}}
+        onHover={() => {}}
+      />,
+    );
+
+    expect(container.querySelector(".quota-card")?.classList.contains("quota-card--compact")).toBe(true);
   });
 });
