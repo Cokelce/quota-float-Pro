@@ -165,7 +165,7 @@ button { font: inherit; }
   color: #17191f;
   background: rgba(237,243,248,.82);
   background-clip: padding-box;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.32), inset 0 0 0 1px rgba(255,255,255,.18), 0 4px 14px rgba(72,88,112,.08);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.16), 0 4px 14px rgba(72,88,112,.08);
   isolation: isolate;
   cursor: move;
   user-select: none;
@@ -191,7 +191,7 @@ button { font: inherit; }
 .quota-orb:hover {
   opacity: 1;
   filter: saturate(1.06) brightness(1.03);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.42), inset 0 0 0 1px rgba(255,255,255,.24), 0 8px 20px rgba(72,88,112,.14);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.2), 0 8px 20px rgba(72,88,112,.14);
   animation: none;
   transform: translate3d(0, -1px, 0) scale(1.025);
 }
@@ -232,7 +232,7 @@ html[data-theme="dark"] .quota-orb {
   color: #eef4ff;
   border-color: rgba(185,205,238,.2);
   background: rgba(15,21,32,.9);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.12), inset 0 0 0 1px rgba(255,255,255,.08), 0 6px 24px rgba(0,0,0,.16);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), 0 6px 24px rgba(0,0,0,.16);
 }
 html[data-theme="dark"] .quota-card--healthy,
 html[data-theme="dark"] .quota-card--signed_out {
@@ -751,7 +751,7 @@ html[data-theme="lvyun"] .quota-orb {
   color: #eef7ea;
   border-color: rgba(210,226,203,.18);
   background: rgba(28,36,27,.9);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.12), inset 0 0 0 1px rgba(255,255,255,.08), 0 6px 24px rgba(0,0,0,.16);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), 0 6px 24px rgba(0,0,0,.16);
 }
 html[data-theme="lvyun"] .quota-card--healthy,
 html[data-theme="lvyun"] .quota-orb.quota-card--healthy,
@@ -919,7 +919,12 @@ html[data-theme="xinghe"] .quota-orb {
   color: #f8f2ff;
   border-color: rgba(255,255,255,.28);
   background: rgba(21,24,92,.9);
+}
+html[data-theme="xinghe"] .quota-card {
   box-shadow: inset 0 1px 0 rgba(255,255,255,.28), inset 0 0 0 1px rgba(255,255,255,.12), 0 10px 34px rgba(32,24,110,.28);
+}
+html[data-theme="xinghe"] .quota-orb {
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.1), 0 10px 34px rgba(32,24,110,.28);
 }
 html[data-theme="xinghe"] .quota-card--healthy,
 html[data-theme="xinghe"] .quota-orb.quota-card--healthy,
@@ -957,8 +962,8 @@ html[data-theme="xinghe"] .quota-orb.quota-card--critical {
 }
 html[data-theme="xinghe"] .aurora {
   background:
-    radial-gradient(circle at 12% 18%, rgba(255,255,255,.96) 0 1px, transparent 2px),
-    radial-gradient(circle at 72% 13%, rgba(255,255,255,.9) 0 1px, transparent 2px),
+    radial-gradient(circle at 18% 30%, rgba(255,154,242,.28) 0 1px, transparent 2px),
+    radial-gradient(circle at 72% 30%, rgba(88,216,255,.24) 0 1px, transparent 2px),
     radial-gradient(circle at 84% 70%, rgba(255,255,255,.88) 0 1px, transparent 2px),
     radial-gradient(circle at 24% 78%, rgba(255,255,255,.8) 0 1px, transparent 2px),
     radial-gradient(circle at 35% 55%, color-mix(in srgb, var(--glow, #c855f8) 72%, transparent) 0 16%, transparent 46%),
