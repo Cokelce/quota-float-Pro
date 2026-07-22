@@ -10,7 +10,8 @@
 
 * { box-sizing: border-box; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
-.operation-notice { position: absolute; z-index: 3; left: 24px; right: 24px; bottom: 12px; display: flex; align-items: center; justify-content: center; gap: 7px; margin: 0; padding: 7px 10px; border-radius: 9px; color: #5b2630; background: rgba(255,239,241,.9); font-size: 10px; text-align: center; }
+.operation-notice { position: absolute; z-index: 3; left: 24px; right: 24px; bottom: 12px; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 7px; margin: 0; padding: 7px 10px; border-radius: 9px; color: #5b2630; background: rgba(255,239,241,.9); font-size: 10px; line-height: 1.35; text-align: center; }
+.operation-notice span { min-width: 0; flex: 1 1 100%; }
 .operation-notice button { min-height: auto; padding: 0; border: 0; color: #23518a; background: transparent; font: inherit; font-weight: 700; white-space: nowrap; cursor: pointer; }
 .operation-notice button:hover { color: #173b69; text-decoration: underline; text-underline-offset: 2px; }
 html, body, #root { width: 100%; height: 100%; margin: 0; overflow: hidden; background: transparent; }

@@ -13,6 +13,13 @@ export interface UpdateMessages {
   failed: string;
 }
 
+export interface AvailableUpdateAction {
+  kind: "install" | "openRelease";
+  message: string;
+  version: string;
+  run: () => Promise<void>;
+}
+
 export async function openReleasePage(): Promise<void> {
   if (!isTauri()) {
     window.open(RELEASE_URL, "_blank", "noopener,noreferrer");
@@ -26,6 +33,7 @@ export async function checkForAppUpdate(
   language: Language,
   messages: UpdateMessages,
   setStatus: (message: string | null) => void,
+  onAvailable: (update: AvailableUpdateAction) => void,
   manual = false,
 ): Promise<void> {
   if (!isTauri()) {
@@ -46,22 +54,25 @@ export async function checkForAppUpdate(
     if (isMac) {
       const prompt = messages.availableMac(update.version);
       setStatus(prompt);
-      if (window.confirm(prompt)) {
-        await openReleasePage();
-      }
+      onAvailable({ kind: "openRelease", message: prompt, version: update.version, run: openReleasePage });
       return;
     }
 
     const prompt = messages.availableWindows(update.version);
     setStatus(prompt);
-    if (!window.confirm(prompt)) return;
-
-    setStatus(messages.downloading(update.version));
-    await update.downloadAndInstall((event) => {
-      if (event.event === "Finished") setStatus(messages.installing);
+    onAvailable({
+      kind: "install",
+      message: prompt,
+      version: update.version,
+      run: async () => {
+        setStatus(messages.downloading(update.version));
+        await update.downloadAndInstall((event) => {
+          if (event.event === "Finished") setStatus(messages.installing);
+        });
+        const { relaunch } = await import("@tauri-apps/plugin-process");
+        await relaunch();
+      },
     });
-    const { relaunch } = await import("@tauri-apps/plugin-process");
-    await relaunch();
   } catch {
     if (!manual) return;
     setStatus(messages.failed);

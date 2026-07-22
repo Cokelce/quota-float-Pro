@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { QuotaCard, QuotaOrb } from "./components/QuotaCard";
 import { fetchSnapshots, getPreferences, listenDesktopEvents, publishTrayPreview, setAlwaysOnTop, setTrayProgress, setWidgetExpanded, setWidgetVisible, startDragging, updatePreferences } from "./lib/bridge";
 import { clampPercent, needsFastRefresh, quotaTier } from "./lib/format";
-import { checkForAppUpdate, openReleasePage } from "./lib/appUpdate";
+import { checkForAppUpdate, openReleasePage, type AvailableUpdateAction } from "./lib/appUpdate";
 import { copy, normalizeLanguage } from "./lib/i18n";
 import { applyApiBalanceProgress, loadApiBalanceBaselines, mergeSnapshots, saveApiBalanceBaselines } from "./lib/snapshots";
 import type { ProviderSnapshot, WidgetPreferences } from "./types";
@@ -19,6 +19,7 @@ export default function App() {
   const [consumingProviders, setConsumingProviders] = useState<Set<string>>(() => new Set());
   const [operationError, setOperationError] = useState<string | null>(null);
   const [showUpdateFallback, setShowUpdateFallback] = useState(false);
+  const [pendingUpdate, setPendingUpdate] = useState<AvailableUpdateAction | null>(null);
   const failures = useRef(0);
   const previousPrimary = useRef(new Map<string, number>());
   const apiBalanceBaselines = useRef(loadApiBalanceBaselines());
@@ -61,14 +62,50 @@ export default function App() {
       setOperationError(message);
       if (message === t.updateFailed) setShowUpdateFallback(true);
       else setShowUpdateFallback(false);
+      if (message === t.updateCurrent || message === t.updateFailed) setPendingUpdate(null);
       if (message === t.updateCurrent) {
         updateNoticeTimer.current = window.setTimeout(() => {
           setOperationError((current) => (current === message ? null : current));
           updateNoticeTimer.current = null;
         }, 1800);
       }
+    }, (update) => {
+      setPendingUpdate(update);
+      if (!manual) return;
+      if (collapseTimer.current !== null) {
+        window.clearTimeout(collapseTimer.current);
+        collapseTimer.current = null;
+      }
+      setClosing(false);
+      setCompact(false);
+      void setWidgetVisible(true).catch(() => undefined);
+      void setWidgetExpanded(true, { width: preferences.expandedSize, height: preferences.expandedSize }).catch(() => undefined);
     }, manual);
-  }, [language, t]);
+  }, [language, preferences.expandedSize, t]);
+
+  const hideUpdateNotice = useCallback(() => {
+    setPendingUpdate(null);
+    setOperationError(null);
+    if (preferences.showStatusBarProgress) {
+      void setWidgetExpanded(false).catch(() => undefined);
+      void setWidgetVisible(false).catch(() => undefined);
+    }
+  }, [preferences.showStatusBarProgress]);
+
+  const runPendingUpdate = useCallback(() => {
+    if (!pendingUpdate) return;
+    const update = pendingUpdate;
+    setPendingUpdate(null);
+    setShowUpdateFallback(false);
+    void update.run()
+      .then(() => {
+        if (update.kind === "openRelease") hideUpdateNotice();
+      })
+      .catch(() => {
+        setOperationError(t.updateFailed);
+        setShowUpdateFallback(true);
+      });
+  }, [hideUpdateNotice, pendingUpdate, t.updateFailed]);
 
   const refresh = useCallback(async (force = false) => {
     try {
@@ -277,7 +314,7 @@ export default function App() {
 
   if (!current) return <div className="loading-card" aria-label={t.loadingQuota}><span /><span /><span /></div>;
 
-  if (preferences.showStatusBarProgress) return null;
+  if (preferences.showStatusBarProgress && !pendingUpdate && !operationError) return null;
 
   if (compact) {
     return <QuotaOrb snapshot={current} language={language} onDrag={() => startDragging()} onHover={handleHover} />;
@@ -298,7 +335,7 @@ export default function App() {
       onRefresh={() => refresh(true)}
       isClosing={closing}
       isConsuming={consumingProviders.has(current.provider)}
-      notice={showUpdateFallback && operationError ? <><span>{operationError}</span><button type="button" onMouseDown={(event) => event.stopPropagation()} onClick={() => void openReleasePage().catch(() => setOperationError("Could not open GitHub Releases."))}>GitHub Releases</button></> : operationError}
+      notice={pendingUpdate ? <><span>{pendingUpdate.message}</span><button type="button" onMouseDown={(event) => event.stopPropagation()} onClick={runPendingUpdate}>{pendingUpdate.kind === "install" ? t.updateInstall : t.updateOpen}</button><button type="button" onMouseDown={(event) => event.stopPropagation()} onClick={hideUpdateNotice}>{t.updateLater}</button></> : showUpdateFallback && operationError ? <><span>{operationError}</span><button type="button" onMouseDown={(event) => event.stopPropagation()} onClick={() => void openReleasePage().catch(() => setOperationError("Could not open GitHub Releases."))}>GitHub Releases</button></> : operationError}
     />
   );
 }
